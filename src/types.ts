@@ -6,6 +6,7 @@ export interface AppConfig extends DirectFileManipulatorOptions {
 	dryRun: boolean;
 	purgeUnused: boolean;
 	concurrency: number;
+	requestTimeout: number;
 }
 
 export interface ProcessingStats {
@@ -19,4 +20,5 @@ export interface ProcessingStats {
 export type FetchResult =
 	| { type: "meta"; total: number }
 	| { type: "doc"; success: true; doc: ReadyEntry; id: string }
-	| { type: "doc"; success: false; error: unknown; id: string };
+	| { type: "doc"; success: false; error: unknown; id: string }
+	| { type: "skipped"; id: string };

@@ -10,6 +10,7 @@ const DEFAULTS: Partial<AppConfig> = {
 	dryRun: false,
 	purgeUnused: false,
 	concurrency: 20,
+	requestTimeout: 60000,
 	// Default to V2 as it is the current standard, can be overridden via Env
 	E2EEAlgorithm: "AES-GCM-V2" as AppConfig["E2EEAlgorithm"],
 };
@@ -64,6 +65,7 @@ export class ConfigProvider {
 		const passphrase = Deno.env.get("LIVESYNC_PASSPHRASE");
 		const localDir = Deno.env.get("LIVESYNC_LOCAL_DIR");
 		const concurrency = Deno.env.get("LIVESYNC_CONCURRENCY");
+		const timeout = Deno.env.get("LIVESYNC_TIMEOUT");
 		const algo = Deno.env.get("LIVESYNC_ALGO");
 
 		if (url) config.url = url;
@@ -82,6 +84,13 @@ export class ConfigProvider {
 			const parsed = parseInt(concurrency, 10);
 			if (!isNaN(parsed) && parsed > 0) {
 				config.concurrency = parsed;
+			}
+		}
+
+		if (timeout) {
+			const parsed = parseInt(timeout, 10);
+			if (!isNaN(parsed) && parsed > 0) {
+				config.requestTimeout = parsed;
 			}
 		}
 

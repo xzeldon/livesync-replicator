@@ -8,5 +8,6 @@
 	"baseDir": "",
 	"dryRun": false,
 	"purgeUnused": false,
-	"concurrency": 20
+	"concurrency": 20,
+	"requestTimeout": 60000
 }

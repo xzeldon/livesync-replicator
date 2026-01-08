@@ -57,6 +57,15 @@ export class ReplicationService {
 			this.stats.totalDocs++;
 			const progressStr = `[${this.stats.totalDocs} / ${totalDocsInDb}]`;
 
+			// Log progress regularly to keep stdout alive, even if we are just skipping chunks
+			if (this.stats.totalDocs % 100 === 0) {
+				Logger.info(`${progressStr} Processing...`);
+			}
+
+			if (result.type === "skipped") {
+				continue;
+			}
+
 			if (!result.success) {
 				this.handleDecryptionFailure(result.id, result.error);
 				consecutiveFailures++;
@@ -75,18 +84,37 @@ export class ReplicationService {
 				continue;
 			}
 
-			await this.syncFile(doc, progressStr);
-
-			// Log progress every 100 items to keep stdout alive but not spammy
-			if (this.stats.totalDocs % 100 === 0) {
-				Logger.info(`${progressStr} Processing...`);
+			// Skip "ix:" (Device customization), "s:", and "ss:" (System/Hidden) files
+			if (
+				doc.path.startsWith("ix:") ||
+				doc.path.startsWith("s:") ||
+				doc.path.startsWith("ss:")
+			) {
+				this.stats.skipped++;
+				continue;
 			}
+
+			// Sanitize local path logic
+			let targetPath: string = doc.path;
+
+			// "i:" prefix denotes the internal config directory (.obsidian).
+			// We strip this prefix to restore the actual folder structure on disk.
+			// Example: "i:.obsidian/app.json" -> ".obsidian/app.json"
+			if (targetPath.startsWith("i:")) {
+				targetPath = targetPath.substring(2);
+			}
+
+			await this.syncFile(doc, targetPath, progressStr);
 		}
 
 		this.logSummary();
 	}
 
-	private async syncFile(doc: ReadyEntry, progressPrefix: string) {
+	private async syncFile(
+		doc: ReadyEntry,
+		targetPath: string,
+		progressPrefix: string
+	) {
 		const remoteMTime = doc.mtime ? Math.floor(doc.mtime / 1000) : 0;
 		const deletionCandidate = doc as ReadyEntry & {
 			_deleted?: boolean;
@@ -95,18 +123,20 @@ export class ReplicationService {
 		const isDeleted = deletionCandidate._deleted || deletionCandidate.deleted;
 
 		if (isDeleted) {
-			if (await this.fs.exists(doc.path)) {
+			if (await this.fs.exists(targetPath)) {
 				if (!this.config.dryRun) {
-					await this.fs.delete(doc.path);
-					Logger.info(`${progressPrefix} Deleted: ${doc.path}`);
+					await this.fs.delete(targetPath);
+					Logger.info(`${progressPrefix} Deleted: ${targetPath}`);
 				} else {
-					Logger.info(`${progressPrefix} [DRY RUN] Would delete: ${doc.path}`);
+					Logger.info(
+						`${progressPrefix} [DRY RUN] Would delete: ${targetPath}`
+					);
 				}
 			}
 			return;
 		}
 
-		const localMTime = await this.fs.getMTime(doc.path);
+		const localMTime = await this.fs.getMTime(targetPath);
 
 		if (localMTime >= remoteMTime) {
 			this.stats.skipped++;
@@ -114,22 +144,22 @@ export class ReplicationService {
 		}
 
 		Logger.info(
-			`${progressPrefix} Downloading: ${doc.path} (Remote: ${remoteMTime} > Local: ${localMTime})`
+			`${progressPrefix} Downloading: ${targetPath} (Remote: ${remoteMTime} > Local: ${localMTime})`
 		);
 		this.stats.downloaded++;
 
 		if (this.config.dryRun) return;
 
 		try {
-			await this.writeToDisk(doc);
+			await this.writeToDisk(doc, targetPath);
 			this.stats.processed++;
 		} catch (e) {
-			Logger.error(`Failed to write file ${doc.path}`, e);
+			Logger.error(`Failed to write file ${targetPath}`, e);
 			this.stats.failed++;
 		}
 	}
 
-	private async writeToDisk(doc: ReadyEntry) {
+	private async writeToDisk(doc: ReadyEntry, targetPath: string) {
 		let content: Uint8Array | string;
 
 		if (doc.type === "newnote") {
@@ -139,7 +169,7 @@ export class ReplicationService {
 			content = getDocData(doc.data);
 		}
 
-		await this.fs.write(doc.path, content, doc.mtime);
+		await this.fs.write(targetPath, content, doc.mtime);
 	}
 
 	private handleDecryptionFailure(id: string, error: unknown) {
@@ -155,9 +185,9 @@ export class ReplicationService {
 	private logSummary() {
 		Logger.info("------------------------------------------------");
 		Logger.info("Replication Summary:");
-		Logger.info(`Total Scanned: ${this.stats.totalDocs}`);
+		Logger.info(`Total DB Rows Scanned: ${this.stats.totalDocs}`);
 		Logger.info(`Downloaded/Updated: ${this.stats.downloaded}`);
-		Logger.info(`Skipped (Up-to-date): ${this.stats.skipped}`);
+		Logger.info(`Skipped (Up-to-date/Filtered): ${this.stats.skipped}`);
 		Logger.info(`Failed: ${this.stats.failed}`);
 		Logger.info("------------------------------------------------");
 	}

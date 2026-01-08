@@ -1,20 +1,18 @@
 import { pooledMap } from "@std/async";
-import {
-	DirectFileManipulator,
-	DirectFileManipulatorOptions,
-	PouchDB,
-	ReadyEntry,
-} from "../deps.ts";
+import { DirectFileManipulator, PouchDB, ReadyEntry } from "../deps.ts";
 import { Logger } from "./logger.ts";
-import { FetchResult } from "./types.ts";
+import { AppConfig, FetchResult } from "./types.ts";
 
 /**
  * Adapter extending the library's manipulator to enforce
  * usage of the native Deno fetch API and robust enumeration.
  */
 export class LiveSyncAdapter extends DirectFileManipulator {
-	constructor(options: DirectFileManipulatorOptions) {
-		super(options);
+	private config: AppConfig;
+
+	constructor(config: AppConfig) {
+		super(config);
+		this.config = config;
 	}
 
 	/**
@@ -26,13 +24,13 @@ export class LiveSyncAdapter extends DirectFileManipulator {
 		_name?: string,
 		_options?: unknown
 	): unknown {
-		const url = `${this.options.url}/${this.options.database}`;
+		const url = `${this.config.url}/${this.config.database}`;
 
 		return new PouchDB(url, {
 			adapter: "http",
 			auth: {
-				username: this.options.username,
-				password: this.options.password,
+				username: this.config.username,
+				password: this.config.password,
 			},
 			// Inject native fetch to handle HTTP/2 and Keep-Alive correctly
 			fetch: async (url: string | Request, opts?: RequestInit) => {
@@ -42,7 +40,10 @@ export class LiveSyncAdapter extends DirectFileManipulator {
 					: new Headers();
 
 				const controller = new AbortController();
-				const timeoutId = setTimeout(() => controller.abort(), 60000);
+				const timeoutId = setTimeout(
+					() => controller.abort(),
+					this.config.requestTimeout
+				);
 
 				try {
 					return await fetch(fetchUrl, {
@@ -87,17 +88,19 @@ export class LiveSyncAdapter extends DirectFileManipulator {
 		// Yield metadata first
 		yield { type: "meta", total: rows.length };
 
-		const processRow = async (
-			row: (typeof rows)[0]
-		): Promise<FetchResult | null> => {
+		const processRow = async (row: (typeof rows)[0]): Promise<FetchResult> => {
 			const id = row.id;
 			try {
 				const doc = await this.getById(id);
-				if (!doc) return null;
+
+				if (!doc) return { type: "skipped", id };
+
 				if (doc.type === "newnote" || doc.type === "plain") {
 					return { type: "doc", success: true, doc: doc as ReadyEntry, id };
 				}
-				return null;
+
+				// It's a chunk, revision, or other internal data
+				return { type: "skipped", id };
 			} catch (e) {
 				return { type: "doc", success: false, error: e, id };
 			}
@@ -106,10 +109,7 @@ export class LiveSyncAdapter extends DirectFileManipulator {
 		const results = pooledMap(concurrency, rows, processRow);
 
 		for await (const res of results) {
-			// Filter out null results (skipped documents)
-			if (res) {
-				yield res;
-			}
+			yield res;
 		}
 	}
 }
