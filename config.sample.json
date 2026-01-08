@@ -1,0 +1,11 @@
+{
+	"url": "http://127.0.0.1:5984",
+	"database": "livesync",
+	"username": "admin",
+	"password": "your_couchdb_password",
+	"passphrase": "your_obsidian_e2ee_password",
+	"localDir": "./vault",
+	"baseDir": "",
+	"dryRun": false,
+	"purgeUnused": false
+}
