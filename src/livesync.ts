@@ -1,3 +1,4 @@
+import { pooledMap } from "@std/async";
 import {
 	DirectFileManipulator,
 	DirectFileManipulatorOptions,
@@ -58,7 +59,7 @@ export class LiveSyncAdapter extends DirectFileManipulator {
 
 	/**
 	 * Robust enumeration method that fetches all documents first,
-	 * then attempts to decrypt them one by one.
+	 * then attempts to decrypt them concurrently using a pool.
 	 * This bypasses the library's prefix-based scanning which fails on some DB versions.
 	 */
 	async *fetchAllDocuments(concurrency: number): AsyncGenerator<FetchResult> {
@@ -86,7 +87,10 @@ export class LiveSyncAdapter extends DirectFileManipulator {
 		// Yield metadata first
 		yield { type: "meta", total: rows.length };
 
-		const fetchOne = async (id: string): Promise<FetchResult | null> => {
+		const processRow = async (
+			row: (typeof rows)[0]
+		): Promise<FetchResult | null> => {
+			const id = row.id;
 			try {
 				const doc = await this.getById(id);
 				if (!doc) return null;
@@ -99,13 +103,12 @@ export class LiveSyncAdapter extends DirectFileManipulator {
 			}
 		};
 
-		for (let i = 0; i < rows.length; i += concurrency) {
-			const batch = rows.slice(i, i + concurrency);
-			const promises = batch.map((row) => fetchOne(row.id));
-			const results = await Promise.all(promises);
+		const results = pooledMap(concurrency, rows, processRow);
 
-			for (const res of results) {
-				if (res) yield res;
+		for await (const res of results) {
+			// Filter out null results (skipped documents)
+			if (res) {
+				yield res;
 			}
 		}
 	}
