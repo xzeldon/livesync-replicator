@@ -9,6 +9,7 @@ const DEFAULTS: Partial<AppConfig> = {
 	localDir: "./vault",
 	dryRun: false,
 	purgeUnused: false,
+	concurrency: 20,
 	// Default to V2 as it is the current standard, can be overridden via Env
 	E2EEAlgorithm: "AES-GCM-V2" as AppConfig["E2EEAlgorithm"],
 };
@@ -62,6 +63,7 @@ export class ConfigProvider {
 		const pass = Deno.env.get("LIVESYNC_PASSWORD");
 		const passphrase = Deno.env.get("LIVESYNC_PASSPHRASE");
 		const localDir = Deno.env.get("LIVESYNC_LOCAL_DIR");
+		const concurrency = Deno.env.get("LIVESYNC_CONCURRENCY");
 		const algo = Deno.env.get("LIVESYNC_ALGO");
 
 		if (url) config.url = url;
@@ -72,8 +74,16 @@ export class ConfigProvider {
 		if (localDir) config.localDir = localDir;
 		if (algo) config.E2EEAlgorithm = algo as AppConfig["E2EEAlgorithm"];
 
-		const dryRun = Deno.env.get("LIVESYNC_DRY_RUN");
-		if (dryRun) config.dryRun = dryRun === "true";
+		if (Deno.env.get("LIVESYNC_DRY_RUN")) {
+			config.dryRun = Deno.env.get("LIVESYNC_DRY_RUN") === "true";
+		}
+
+		if (concurrency) {
+			const parsed = parseInt(concurrency, 10);
+			if (!isNaN(parsed) && parsed > 0) {
+				config.concurrency = parsed;
+			}
+		}
 
 		return config;
 	}

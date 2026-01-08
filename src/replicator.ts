@@ -41,11 +41,21 @@ export class ReplicationService {
 	}
 
 	private async processDocuments() {
-		const generator = this.liveSync.fetchAllDocuments();
+		const generator = this.liveSync.fetchAllDocuments(this.config.concurrency);
 		let consecutiveFailures = 0;
+		let totalDocsInDb = 0;
 
 		for await (const result of generator) {
+			// Handle metadata (total count)
+			if (result.type === "meta") {
+				totalDocsInDb = result.total;
+				Logger.info(`Target: ~${totalDocsInDb} documents to check.`);
+				continue;
+			}
+
+			// Handle document processing
 			this.stats.totalDocs++;
+			const progressStr = `[${this.stats.totalDocs} / ${totalDocsInDb}]`;
 
 			if (!result.success) {
 				this.handleDecryptionFailure(result.id, result.error);
@@ -58,26 +68,25 @@ export class ReplicationService {
 				continue;
 			}
 
-			// Reset failure counter on success
 			consecutiveFailures = 0;
-			const doc = result.doc as ReadyEntry;
+			const doc = result.doc;
 
-			// Filter by base directory if configured
 			if (this.config.baseDir && !doc.path.startsWith(this.config.baseDir)) {
 				continue;
 			}
 
-			await this.syncFile(doc);
+			await this.syncFile(doc, progressStr);
 
-			if (this.stats.totalDocs % 50 === 0) {
-				Logger.info(`Progress: Scanned ${this.stats.totalDocs} documents...`);
+			// Log progress every 100 items to keep stdout alive but not spammy
+			if (this.stats.totalDocs % 100 === 0) {
+				Logger.info(`${progressStr} Processing...`);
 			}
 		}
 
 		this.logSummary();
 	}
 
-	private async syncFile(doc: ReadyEntry) {
+	private async syncFile(doc: ReadyEntry, progressPrefix: string) {
 		const remoteMTime = doc.mtime ? Math.floor(doc.mtime / 1000) : 0;
 		const deletionCandidate = doc as ReadyEntry & {
 			_deleted?: boolean;
@@ -89,8 +98,9 @@ export class ReplicationService {
 			if (await this.fs.exists(doc.path)) {
 				if (!this.config.dryRun) {
 					await this.fs.delete(doc.path);
+					Logger.info(`${progressPrefix} Deleted: ${doc.path}`);
 				} else {
-					Logger.info(`[DRY RUN] Would delete: ${doc.path}`);
+					Logger.info(`${progressPrefix} [DRY RUN] Would delete: ${doc.path}`);
 				}
 			}
 			return;
@@ -104,7 +114,7 @@ export class ReplicationService {
 		}
 
 		Logger.info(
-			`Downloading: ${doc.path} (Remote: ${remoteMTime} > Local: ${localMTime})`
+			`${progressPrefix} Downloading: ${doc.path} (Remote: ${remoteMTime} > Local: ${localMTime})`
 		);
 		this.stats.downloaded++;
 

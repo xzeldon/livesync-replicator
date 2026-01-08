@@ -7,5 +7,6 @@
 	"localDir": "./vault",
 	"baseDir": "",
 	"dryRun": false,
-	"purgeUnused": false
+	"purgeUnused": false,
+	"concurrency": 20
 }
