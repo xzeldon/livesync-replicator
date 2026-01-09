@@ -1,0 +1,9 @@
+.git
+.gitmodules
+config.json
+.env
+vault/
+node_modules/
+.DS_Store
+Dockerfile
+docker-compose.yml

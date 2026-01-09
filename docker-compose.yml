@@ -1,0 +1,12 @@
+services:
+    replicator:
+        build: .
+        container_name: livesync-replicator
+        restart: unless-stopped
+        volumes:
+            - ./vault:/app/vault
+        env_file:
+            - .env
+        environment:
+            - PUID=1000
+            - PGID=1000

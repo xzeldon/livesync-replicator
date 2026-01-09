@@ -14,72 +14,121 @@ Previously, if you wanted to create a readable backup of your Vault on a server,
 
 ## Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine.
+These instructions will help you set up the project on your local machine or server.
 
 ### Prerequisites
 
-You need the following tools installed on your system:
+Depending on how you want to run the tool, you need:
 
+**For Local Run:**
 - [Deno](https://deno.com) (v2.x recommended)
 - [Git](https://git-scm.com)
 
-### Installing
+**For Docker:**
+- [Docker](https://www.docker.com/) & Docker Compose
+- [Git](https://git-scm.com)
+
+### Installation
 
 1. **Clone the repository**
 
-   Clone the project and initialize the required submodules.
+First, clone the project and initialize the required submodules (essential for both Local and Docker methods).
 
-   ```bash
-   git clone https://github.com/xzeldon/livesync-replicator.git
-   cd livesync-replicator
-   git submodule update --init --recursive
-   ```
+```bash
+git clone https://github.com/xzeldon/livesync-replicator.git
+cd livesync-replicator
+git submodule update --init --recursive
+```
 
 2. **Configuration**
 
-   You can configure the application using a `config.json` file **OR** Environment Variables. Environment variables take precedence over the file.
+You can configure the application using a `config.json` file **OR** Environment Variables. Environment variables take precedence over the configuration file.
 
-   **Option A: config.json**:
-   Create a file named `config.json` in the root directory:
+**Option A: config.json (Recommended for Local Run)**:
 
-   ```json
-   {
-   	"url": "http://127.0.0.1:5984",
-   	"database": "livesync",
-   	"username": "admin",
-   	"password": "your_couchdb_password",
-   	"passphrase": "your_obsidian_e2ee_passphrase",
-   	"localDir": "./vault",
-   	"dryRun": false,
-   	"concurrency": 20,
-   	"requestTimeout": 60000
-   }
-   ```
+Create a file named `config.json` in the root directory:
 
-   **Option B: Environment Variables**:
-   Useful for servers or Docker (coming soon).
+```json
+{
+  "url": "http://127.0.0.1:5984", 
+  "database": "livesync", 
+  "username": "admin", 
+  "password": "your_couchdb_password", 
+  "passphrase": "your_obsidian_e2ee_passphrase", 
+  "localDir": "./vault", 
+  "dryRun": false, 
+  "concurrency": 20, 
+  "requestTimeout": 60000
+}
+```
 
-   - `LIVESYNC_URL`: The URL of your CouchDB instance (e.g., `http://127.0.0.1:5984`).
-   - `LIVESYNC_DATABASE`: The database name (default: `livesync`).
-   - `LIVESYNC_USERNAME`: CouchDB username.
-   - `LIVESYNC_PASSWORD`: CouchDB password.
-   - `LIVESYNC_PASSPHRASE`: Your Obsidian End-to-End Encryption passphrase.
-   - `LIVESYNC_LOCAL_DIR`: Directory where files will be saved.
-   - `LIVESYNC_DRY_RUN`: Set to `true` to simulate the process without writing files.
-   - `LIVESYNC_CONCURRENCY`: Number of parallel downloads (default: `20`). Increase for faster speeds on good networks and servers.
-   - `LIVESYNC_TIMEOUT`: Request timeout in milliseconds (default: `60000`). Increase if you have large files or a slow connection.
+**Option B: Environment Variables (Recommended for Docker)**:
 
-3. **Run the replicator**
+`LIVESYNC_URL`: The URL of your CouchDB instance (e.g., `http://127.0.0.1:5984`).
+`LIVESYNC_DATABASE`: The database name (default: `livesync`).
+`LIVESYNC_USERNAME`: CouchDB username.
+`LIVESYNC_PASSWORD`: CouchDB password.
+`LIVESYNC_PASSPHRASE`: Your Obsidian End-to-End Encryption passphrase.
+`LIVESYNC_LOCAL_DIR`: Directory where files will be saved.
+`LIVESYNC_DRY_RUN`: Set to `true` to simulate the process without writing files.
+`LIVESYNC_CONCURRENCY`: Number of parallel downloads (default: `20`). Increase for faster speeds on good networks.
+`LIVESYNC_TIMEOUT`: Request timeout in milliseconds (default: `60000`).
 
-   ```bash
-   deno task start
-   ```
+---
 
-   The script will prepare the library, connect to the database, and download your decrypted files to the target directory.
+## Running Locally
 
-## Deployment
+If you have Deno installed and want to run the script directly:
 
-Docker instructions coming soon.
+```bash
+deno task start
+```
+
+The script will prepare the library, connect to the database, and download your decrypted files to the target directory specified in your config.
+
+---
+
+## Running with Docker
+
+This method is recommended for always-on servers or scheduled backups as it handles dependencies and permissions automatically.
+
+### 1. Setup Environment Variables
+Copy the example environment file and configure your credentials:
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+Fill in your CouchDB details inside the `.env` file. 
+
+> **Note:** You generally do not need to change `LIVESYNC_LOCAL_DIR` when using Docker, as the container is pre-configured to save data to `/app/vault`.
+
+### 2. Run with Docker Compose
+
+```bash
+docker compose up -d
+```
+
+The replicator will start, and your vault files will appear in the `./vault` folder on your host machine (mapped via volumes).
+
+### 3. Permissions (PUID/PGID)
+To ensure the downloaded files are owned by your host user (and not `root`), the container supports `PUID` (User ID) and `PGID` (Group ID).
+
+The default in `docker-compose.yml` is set to `1000:1000`. If your user ID on the host is different, update the environment variables in `docker-compose.yml` or your `.env` file:
+
+```yaml
+environment:
+  - PUID=1001 # Change to your UID (run `id -u` to find out)
+  - PGID=1001 # Change to your GID (run `id -g` to find out)
+```
+
+### 4. Viewing Logs
+To check the progress or debug issues:
+
+```bash
+docker compose logs -f
+```
 
 ## License
 
