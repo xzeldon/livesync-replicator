@@ -117,10 +117,10 @@ You can run the replicator in two modes by adjusting the `LIVESYNC_INTERVAL` var
 	> **Important:** In this mode, change `restart: unless-stopped` to `restart: no` in your `docker-compose.yml`. Otherwise, Docker will endlessly restart the container immediately after it finishes.
 
 ### 3. Run with Docker Compose
-Start the container in detached mode:
+Start the container
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 The replicator will start, and your vault files will appear in the `./vault` folder on your host machine (mapped via volumes).
@@ -145,4 +145,4 @@ docker compose logs -f
 
 ## License
 
-Licensed under the MIT License.
+Licensed under the [MIT License](./LICENSE).
