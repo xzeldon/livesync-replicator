@@ -1,6 +1,6 @@
 services:
     replicator:
-        build: .
+        image: ghcr.io/xzeldon/livesync-replicator:latest
         container_name: livesync-replicator
         restart: unless-stopped
         volumes:
