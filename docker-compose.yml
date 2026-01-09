@@ -2,7 +2,7 @@ services:
     replicator:
         image: ghcr.io/xzeldon/livesync-replicator:latest
         container_name: livesync-replicator
-        restart: no
+        restart: unless-stopped
         volumes:
             - ./vault:/app/vault
         env_file:
@@ -10,3 +10,4 @@ services:
         environment:
             - PUID=1000
             - PGID=1000
+            - LIVESYNC_INTERVAL=3600 # Every hour

@@ -64,15 +64,16 @@ Create a file named `config.json` in the root directory:
 
 **Option B: Environment Variables (Recommended for Docker)**:
 
-`LIVESYNC_URL`: The URL of your CouchDB instance (e.g., `http://127.0.0.1:5984`).
-`LIVESYNC_DATABASE`: The database name (default: `livesync`).
-`LIVESYNC_USERNAME`: CouchDB username.
-`LIVESYNC_PASSWORD`: CouchDB password.
-`LIVESYNC_PASSPHRASE`: Your Obsidian End-to-End Encryption passphrase.
-`LIVESYNC_LOCAL_DIR`: Directory where files will be saved.
-`LIVESYNC_DRY_RUN`: Set to `true` to simulate the process without writing files.
-`LIVESYNC_CONCURRENCY`: Number of parallel downloads (default: `20`). Increase for faster speeds on good networks.
-`LIVESYNC_TIMEOUT`: Request timeout in milliseconds (default: `60000`).
+- `LIVESYNC_URL`: The URL of your CouchDB instance (e.g., `http://127.0.0.1:5984`).
+- `LIVESYNC_DATABASE`: The database name (default: `livesync`).
+- `LIVESYNC_USERNAME`: CouchDB username.
+- `LIVESYNC_PASSWORD`: CouchDB password.
+- `LIVESYNC_PASSPHRASE`: Your Obsidian End-to-End Encryption passphrase.
+- `LIVESYNC_LOCAL_DIR`: Directory where files will be saved.
+- `LIVESYNC_DRY_RUN`: Set to `true` to simulate the process without writing files.
+- `LIVESYNC_CONCURRENCY`: Number of parallel downloads (default: `20`). Increase for faster speeds on good networks.
+- `LIVESYNC_TIMEOUT`: Request timeout in milliseconds (default: `60000`).
+- `LIVESYNC_INTERVAL`: **(Docker Only)** Interval in seconds for continuous synchronization (e.g., `3600` for 1 hour). If unset, the container runs once and exits.
 
 ---
 
@@ -104,18 +105,30 @@ Fill in your CouchDB details inside the `.env` file.
 
 > **Note:** You generally do not need to change `LIVESYNC_LOCAL_DIR` when using Docker, as the container is pre-configured to save data to `/app/vault`.
 
-### 2. Run with Docker Compose
+### 2. Choose Operation Mode
+
+You can run the replicator in two modes by adjusting the `LIVESYNC_INTERVAL` variable in your `docker-compose.yml` or `.env` file.
+
+*   **Daemon Mode (Recommended):**  
+    Set `LIVESYNC_INTERVAL` to a value in seconds (e.g., `3600` for every hour). The container will remain running and automatically sync your vault.
+    
+*   **One-Off Mode:**  
+    Remove or comment out the `LIVESYNC_INTERVAL` variable. The container will perform a single sync and then exit. This is useful if you prefer to use an external scheduler (like cron).
+	> **Important:** In this mode, change `restart: unless-stopped` to `restart: no` in your `docker-compose.yml`. Otherwise, Docker will endlessly restart the container immediately after it finishes.
+
+### 3. Run with Docker Compose
+Start the container in detached mode:
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
 The replicator will start, and your vault files will appear in the `./vault` folder on your host machine (mapped via volumes).
 
-### 3. Permissions (PUID/PGID)
+### 4. Permissions (PUID/PGID)
 To ensure the downloaded files are owned by your host user (and not `root`), the container supports `PUID` (User ID) and `PGID` (Group ID).
 
-The default in `docker-compose.yml` is set to `1000:1000`. If your user ID on the host is different, update the environment variables in `docker-compose.yml` or your `.env` file:
+The default in `docker-compose.yml` is set to `1000:1000`. If your user ID on the host is different, update the environment variables in `docker-compose.yml`:
 
 ```yaml
 environment:
@@ -123,7 +136,7 @@ environment:
   - PGID=1001 # Change to your GID (run `id -g` to find out)
 ```
 
-### 4. Viewing Logs
+### 5. Viewing Logs
 To check the progress or debug issues:
 
 ```bash
