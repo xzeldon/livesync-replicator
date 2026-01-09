@@ -8,11 +8,11 @@ COPY deno.json deps.ts setup.ts ./
 
 COPY lib ./lib
 
-RUN deno run --allow-read --allow-write setup.ts
 RUN deno cache --sloppy-imports deps.ts
 
 COPY . .
 
+RUN deno run --allow-read --allow-write setup.ts
 RUN deno cache --sloppy-imports main.ts
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh

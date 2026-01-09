@@ -2,7 +2,7 @@ services:
     replicator:
         image: ghcr.io/xzeldon/livesync-replicator:latest
         container_name: livesync-replicator
-        restart: unless-stopped
+        restart: no
         volumes:
             - ./vault:/app/vault
         env_file:
